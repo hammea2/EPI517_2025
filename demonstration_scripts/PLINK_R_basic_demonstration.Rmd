@@ -1,0 +1,431 @@
+---
+title: 'Demonstration: PLINK and R for Genetic Analyses'
+author: "Austin Hammermeister Suger"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+
+# Install and load R packages #
+
+## Install pacman from CRAN
+#install.packages("pacman") # remove comment if you need to install this for the first time
+
+## Install and load tidyverse, qqman, vcfR, and RColorBrewer from CRAN
+p_load(tidyverse,qqman,vcfR,RColorBrewer)
+```
+
+# General Notes
+
+Please do not just copy this code for use in your homework assignments. Try to reproduce the R code and PLINK commands so that you understand what they do.
+
+# Verify PLINK installation
+
+```{r verify}
+getwd()
+system("./plink")
+```
+
+# System function explanation
+
+In R, the system() function takes a string (set of characters) as an input and invokes it as a command in your machine's command-line. We can use this function to write our PLINK commands within an R script. However, the PLINK commands are not actually being executed in R, they are still being run in the command-line.
+
+```{r system}
+# Example echo command to run in our system's command line
+system("echo 'Hello World!'")
+
+```
+
+## Load example.fam file into R (this is just a text file)
+
+This is just to show you the structure of a PLINK .fam file. PLINK .fam files do not have a header line, so we will need to name the columns based on our own knowledge. The columns in a .fam file indicate family ID, individual ID, paternal ID, maternal ID, sex, and phenotype.
+
+```{r PLINK_fam}
+example.fam<-read.table(file="./COURSE_MATERIALS/example_data/example.fam",
+                        header=FALSE,
+                        na="NA")
+colnames(example.fam)<-c("Family_ID",
+                         "Individual_ID",
+                         "Paternal_ID",
+                         "Maternal_ID",
+                         "Sex",
+                         "Phenotype") # .fam files do not have headers
+glimpse(example.fam)
+```
+
+## Load the example.bim file into R (this is just a text file)
+
+This is just to show you the structure of a PLINK .bim file. PLINK .bim files do not have a header line, so we will need to name the columns based on our own knowledge. The columns in a .bim file indicate chromosome, SNP id, cM, base pair, allele 1, and allele 2.
+
+```{r PLINK_bim}
+example.bim<-read.table(file="./COURSE_MATERIALS/example_data/example.bim",
+                        header=FALSE,
+                        na="NA")
+colnames(example.bim)<-c("chromosome","SNP_ID", "cM","base_pair","allele_1","allele_2")
+glimpse(example.bim)
+```
+
+## Do not load the .bed file
+
+You should not try loading or opening a .bed file as it contains the genotypes stored in binary format. 
+
+# PLINK file allele frequency report
+
+PLINK has a variety of flags that can produce basic information about a genetic dataset One of the most commonly used is the allele frequency report.
+
+The --bfile flag specifies the file prefix for a .bed file, .bim file, and .fam file that should be loaded.
+I am including the entire file path for where the example PLINK fileset is stored.
+The PLINK flag --freq writes a minor allele frequency report.
+The --out flag specifies the prefix for the new files that will be created by PLINK.
+I am going to have the output go to a new directory I have named "example" and give the file the prefix "example"
+I will use a bash chunk instead of an R code chunk to run PLINK.
+You can use " \" to separate arguments in the PLINK command into multiple lines if it makes it easier to read.
+
+
+```{bash PLINK_freq}
+./plink \
+--bfile ./COURSE_MATERIALS/example_data/example \
+--freq \
+--out ./example/example
+```
+
+## Load the .fam file that we just created
+
+We can load the PLINK allele frequency report into R. This report file does have a header line.
+
+```{r load_freq}
+example.frq<-read.table(file="./example/example.frq",
+                        header=TRUE,
+                        na="NA")
+glimpse(example.frq)
+```
+
+## Make some plots
+
+We could use ggplot plots to examine the distribution of variants across chromosomes and the distribution of minor allele frequency (MAF).
+
+```{r plot_freq}
+palette <- colorRampPalette(brewer.pal('Spectral',n=10))
+
+ggplot(data = example.frq,aes(x=as.factor(CHR),fill=as.factor(CHR)))+
+  geom_bar()+
+  coord_cartesian(xlim = c(1,22))+
+  scale_fill_manual(values = setNames(palette(22),
+      levels(as.factor(example.frq$CHR))))+
+  labs(y="# of genetic variants", x = "Chromosome")+
+  guides(fill="none")+
+  theme_bw()
+
+ggplot(data = example.frq,aes(x=MAF))+
+  geom_histogram(bins = 50)+
+  labs(y="# of genetic variants", x = "minor allele frequency (MAF)")+
+  theme_bw()
+```
+
+## Check for monomorphic variants
+
+It turns out that this data set contains a large number of variants where only one allele is observed in these individuals (MAF = 0)
+
+```{r plot_monoallelic}
+table(example.frq$MAF==0)
+```
+
+# Basic GWAS for a binary outcome
+
+## Quality control filters
+
+Before we run a genetic analysis we often want to apply quality control filters. Many of these filters can be applied directly in PLINK in the same command that you use to run your analysis. 
+
+The --maf flag filters out variants with MAF less than the specified value.
+The --hwe flag filters out variants with HW exact test p-values less than the specified value.
+
+It is recommended that you use the midp modifier for the --hwe which applies the mid-p adjustment described in Graffelman J, Moreno V (2013). The mid-p adjustment tends to bring the null rejection rate in line with the nominal p-value, and also reduces the filter's tendency to favor retention of variants with missing data. 
+
+The --geno flag filters out variants with missing call rates greater than the specified value.
+The --mind flag filters out samples with missing call rates greater than the specified value.
+
+## Running a basic logistic regression GWAS
+
+The --logistic flag tells PLINK to run a logistic regression GWAS for a binary outcome.
+The default is to use the phenotype specified in the 6th column of the .fam file.
+The default is to use an additive genetic effect model.
+A dominance model can be specified using the 'dominant' modifier after the --logistic flag.
+A recessive model can be specified using the 'recessive' modifier after the --logistic flag.
+The --ci option tells PLINK to include confidence intervals in the results output.
+
+We can put all the flags we know together run a GWAS in a single command. The order of the flags does not matter at all since PLINK has an internal order of operations that it will always follow.
+
+```{bash PLINK_basic_logistic}
+./plink \
+--bfile ./COURSE_MATERIALS/example_data/example \
+--maf 0.05 \
+--hwe midp 1e-25 \
+--geno 0.05 \
+--mind 0.05 \
+--logistic \
+--ci 0.95 \
+--out ./example/example_basic
+```
+
+## Loading the results file
+
+We can load the logistic regression GWAS results file into R. This file does have a header line.
+
+```{r PLINK_load_basic_logistic}
+example_basic_logistic_GWAS_results<-read.table(file="./example/example_basic.assoc.logistic",
+                                                header=TRUE,
+                                                na="NA")
+glimpse(example_basic_logistic_GWAS_results)
+```
+
+## Manhattan plot
+
+We can create a Manhattan plot to more easily visualize the GWAS results.
+
+```{r PLINK_Manhattan_basic_logistic}
+## Manhattan plot 
+manhattan(example_basic_logistic_GWAS_results %>%
+            na.omit(), # I am removing missing p-values because they can mess up this plotting function
+          chr = "CHR",
+          bp = "BP",
+          p = "P")
+```
+
+## QQ plot
+
+We can create a QQ plot to check for systematic inflation of test statistics (which could be due to confounding).
+
+```{r PLINK_QQ_basic_logistic}
+## Q-Q plot 
+qq(example_basic_logistic_GWAS_results$P)
+```
+
+
+# GWAS for a continuous outcome
+
+## Running a linear regression GWAS with a covariate
+
+The --linear flag tells PLINK to run a linear regression GWAS for a continuous outcome. All the same modifiers as the --logistic flag still apply.
+
+The --pheno flag specifies a file containing phenotypes for subjects in the data set.
+Without this flag PLINK will use the phenotype present in the .fam file (6th column).
+The first two columns should be the FID and IID (identical to the .fam file).
+The 3rd column contains the phenotype.
+
+The --covar flag specifies a covariate file to use.
+The first two columns should be the FID and IID (identical to the .fam file).
+The remaining columns contain covariates.
+
+We can put all the flags we know together run a GWAS in a single command. 
+
+```{bash PLINK_linear}
+./plink \
+--bfile ./COURSE_MATERIALS/example_data/example \
+--maf 0.05 \
+--hwe midp 1e-25 \
+--geno 0.05 \
+--mind 0.05 \
+--linear \
+--pheno ./COURSE_MATERIALS/example_data/example.pheno \
+--covar ./COURSE_MATERIALS/example_data/example.cov \
+--ci 0.95 \
+--out ./example/example
+```
+
+## Loading the results file
+
+We can load the logistic regression GWAS results file into R. This file does have column headers.
+
+```{r PLINK_load_linear}
+example_linear_GWAS_results<-read.table(file="./example/example.assoc.linear",
+                                        header=TRUE,
+                                        na="NA")
+glimpse(example_linear_GWAS_results)
+```
+## Select only output for the additive genetic effect of each SNP
+
+Since we included a covariate PLINK also produced beta estimates for the covariate in each linear regression model. However, we are only interested in the results for the genetic effects.
+
+```{r PLINK_filter_linear}
+## Filter to only rows where TEST == ADD (additive genetic effect estimates)
+linear_results = example_linear_GWAS_results[example_linear_GWAS_results$TEST=="ADD",]
+```
+
+## Manhattan plot
+
+```{r PLINK_Manhattan_linear}
+## Manhattan plot
+manhattan(linear_results %>% na.omit(),
+          chr = "CHR",
+          bp = "BP",
+          p = "P")
+```
+
+## QQ plot
+
+```{r PLINK_QQ_linear}
+## Q-Q plot
+qq(linear_results$P)
+```
+
+
+## Top results
+
+```{r PLINK_linear_top_results}
+top_results_linear<-linear_results[order(linear_results$P),]
+glimpse(top_results_linear[1:5,])
+```
+
+# GWAS for a continuous outcome in R
+
+You will not be expected to do any of this for the course. I am including this to show why PLINK makes things much much much easier.
+
+## Create a VCF version of the QC filtered PLINK data set to load into R
+
+```{bash PLINK_vcf_convert}
+./plink \
+--bfile ./COURSE_MATERIALS/example_data/example \
+--maf 0.05 \
+--hwe midp 1e-25 \
+--geno 0.05 \
+--mind 0.05 \
+--recode vcf \
+--out ./example/example
+```
+
+## Load the VCF into R (this is not normally reccommended unless you have a very small data set as we do here)
+
+```{r R_vcf_load}
+example_vcf = vcfR::read.vcfR("./example/example.vcf")
+```
+
+## Show VCF metadata from header lines
+
+```{r R_vcf_meta}
+example_vcf@meta
+```
+## Get variant information from VCF fixed fields (information about the genetic variants in the VCF)
+
+```{r R_vcf_meta}
+example_variants = example_vcf@fix %>%
+  as.data.frame()
+head(example_variants)
+```
+
+## Extract the genotype matrix from the VCF then convert it to integer dosage values
+
+```{r R_vcf_load}
+example_genotypes = example_vcf@gt[,2:ncol(example_vcf@gt)]
+example_genotypes[1:5,1:5]
+
+samples = colnames(example_genotypes)
+example_genotypes[example_genotypes=="0/0"]<-0
+example_genotypes[example_genotypes=="0/1"]<-1
+example_genotypes[example_genotypes=="1/1"]<-2
+example_genotypes =  matrix(as.numeric(example_genotypes),
+                            ncol = ncol(example_genotypes)) 
+colnames(example_genotypes) = samples
+example_genotypes[1:5,1:5]
+```
+
+## Load and merge the phenotype and covariate files
+
+```{r other_load}
+example_phenotype = read.table("./COURSE_MATERIALS/example_data/example.pheno") 
+colnames(example_phenotype) = c("FID","IID","Y")
+example_covariate = read.table("./COURSE_MATERIALS/example_data/example.cov")
+colnames(example_covariate) = c("FID","IID","covariate")
+example_pheno_data = left_join(example_phenotype, example_covariate, by = c("FID","IID"))
+
+glimpse(example_pheno_data)
+head(colnames(example_genotypes))
+```
+
+Luckily for us, the order of samples across columns of the genotype matrix is the same as the order of samples across rows in the phenotype data file
+
+## Remove phenotype data for the sample that was dropped by PLINK due to excessive missingness
+
+```{r R_pheno_drop}
+example_pheno_data = example_pheno_data %>% filter(paste0(FID,"_",IID) %in% colnames(example_genotypes))
+table(paste0(example_pheno_data$FID,"_",example_pheno_data$IID) == colnames(example_genotypes))
+```
+
+## Demonstration of linear regression for a single SNP
+
+```{r R_GWAS_test}
+# Test model for a single SNP
+snp_i = example_genotypes[1,] 
+model_i = glm(Y~snp_i+covariate, family=gaussian(link='identity'),
+  data=example_pheno_data)
+
+summary(model_i)
+```
+
+## Run the linear regression GWAS (this will take quite a while)
+- Note that I am trying to make this R code somewhat efficient by using apply instead of loops
+- There would be more efficient ways to this by using multithreading
+
+```{r R_GWAS}
+# Create a function to fit a linear regression model any SNP
+run_GWAS<- function(snp_i){
+  model_i = glm(Y~snp_i+covariate, family=gaussian(link='identity'),
+  data=example_pheno_data)
+  gbeta <- summary(model_i)$coefficients["snp_i", "Estimate"]
+  gse <- summary(model_i)$coefficients["snp_i", "Std. Error"]
+  gp <- summary(model_i)$coefficients["snp_i", "Pr(>|t|)"]
+  res<- c(gbeta, gse, gp)
+return(res)
+}
+
+# Apply the function to all SNPs
+start_time = Sys.time() 
+
+gwas_results <- apply(example_genotypes, 1, run_GWAS) # apply across rows (SNPs)
+
+Sys.time() - start_time
+
+# Reformat the results data set
+dim(gwas_results) # the rows are (Beta, SE, p-value), columns are SNPs
+gwas_results<- as.data.frame(t(gwas_results)) # flip (transpose) the rows and columns and make it as a data frame
+colnames(gwas_results)<- c("Beta","SE","P")
+head(gwas_results) # now gwas_results has three columns (Beta, SE, P) for each of the rows (SNPs)
+```
+
+## Merge the results with the variant information data
+
+```{r R_GWAS_results}
+gwas_results$ID = example_variants$ID
+gwas_results = left_join(example_variants,gwas_results,by="ID")
+
+gwas_results$CHROM = gwas_results$CHROM %>% as.numeric()
+gwas_results$POS = gwas_results$POS %>% as.numeric()
+```
+
+## Manhattan plot
+
+```{r R_Manhattan_linear}
+## Manhattan plot
+manhattan(gwas_results,
+          chr = "CHROM",
+          bp = "POS", 
+          p = "P",
+          snp = "ID")
+```
+
+## QQ plot
+
+```{r R_QQ_linear}
+## Q-Q plot 
+qq(gwas_results$P)
+```
+
+## Top results
+
+```{r R_top_results_linear}
+gwas_results<-gwas_results[order(gwas_results$P),]
+glimpse(gwas_results[1:5,c("CHROM","POS","ID","ALT","Beta","SE","P")])
+glimpse(top_results_linear[1:5,c("CHR","BP","SNP","A1","BETA","SE","P")])
+```
