@@ -1,5 +1,5 @@
 ---
-title: 'Demonstration: PLINK and R for Genetic Analyses'
+title: 'Demonstration: Introduction to PLINK and R for Genetic Analyses'
 author: "Austin Hammermeister Suger"
 date: "`r Sys.Date()`"
 output: pdf_document
@@ -12,7 +12,7 @@ rm(list = ls())
 # Install and load R packages #
 
 ## Install pacman from CRAN
-#install.packages("pacman") # remove comment if you need to install this for the first time
+#install.packages("pacman") # remove comment if you need to install this 
 
 ## Install and load tidyverse, qqman, vcfR, and RColorBrewer from CRAN
 p_load(tidyverse,qqman,vcfR,RColorBrewer)
@@ -24,9 +24,8 @@ Please do not just copy this code for use in your homework assignments. Try to r
 
 # Verify PLINK installation
 
-```{r verify}
-getwd()
-system("./plink")
+```{bash verify}
+./plink
 ```
 
 # System function explanation

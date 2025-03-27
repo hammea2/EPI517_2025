@@ -1,0 +1,101 @@
+---
+title: 'Demonstration: GxE analysis in PLINK and R'
+author: "Austin Hammermeister Suger"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+
+## Load R packages ##
+
+## Install pacman from CRAN
+#install.packages("pacman") # remove comment if you need to install this 
+library(pacman)
+
+## Install and load tidyverse and qqman from CRAN
+p_load(tidyverse,qqman)
+```
+
+# General Notes
+
+Please do not just copy this code when completing homework assignments. Try to reproduce the R code and PLINK commands so that you understand what they do.
+
+
+# Basic GWEIS for a binary outcome and binary environmental variable
+
+## Running 1 and 2-df GxE tests in PLINK
+
+We will use all the same flags that we would for a regular GWAS.
+
+We have a binary phenotype in a file called example_GxE.pheno. We have a covariate file with a binary environmental exposure of interest and the first 5 PCs (6 total covariates, with E being the first of the 6).
+
+You can add interaction terms into a linear or logistic regression model using --linear interaction or --logistic interaction interaction adds genotype x covariate interactions to the model. Note that this will add all genotype x covariates to the model (which is not typically what you want).
+
+To specify which parameters you want in the model you can use the --parameters flag. The first parameter in a PLINK model is always the genetic effect. The next parameters are main effect estimates for the covariates in the covariate file (in order), so there will be six total (parameters 2-7). The next parameters are the genotype x covariate interaction effect estimates ordered by their placement in the covariate file. So the 8th parameter is the genetic effect x E interaction effect term.
+
+You can also define specific joint tests using the --tests flag. In this example, we want a joint test of parameter 1 (the genetic effect) and parameter 8 (the gene-environment interaction effect).
+
+```{bash PLINK_basic_logistic}
+./plink \
+--bfile ./COURSE_MATERIALS/example_data/example \
+--maf 0.05 \
+--hwe midp 1e-25 \
+--geno 0.05 \
+--mind 0.05 \
+--logistic interaction \
+--pheno ./COURSE_MATERIALS/example_data/example_GxE.pheno \
+--covar ./COURSE_MATERIALS/example_data/example_GxE.covar \
+--ci 0.95 \
+--parameters 1-8 \
+--tests 1,8 \
+--out ./example/example_logistic_GxE
+```
+
+## Loading the results file
+
+We can load the logistic regression GWAS results file into R. This file does have a header line.
+
+```{r PLINK_load_basic_logistic}
+example_logistic_GWEIS_results<-read.table(file="./example/example_logistic_GxE.assoc.logistic", header=TRUE, na="NA")
+glimpse(example_logistic_GWEIS_results)
+
+df1_results = example_logistic_GWEIS_results %>% filter(TEST == "ADDxE")
+df2_results = example_logistic_GWEIS_results %>% filter(TEST == "USER_2DF") %>%
+  select(-c(OR,SE,L95,U95))
+```
+
+## Manhattan plot
+
+We can create a Manhattan plot to more easily visualize the GWEIS results.
+
+```{r PLINK_Manhattan_basic_logistic}
+## 1-df test results
+manhattan(df1_results %>%
+            na.omit(),
+          chr = "CHR",
+          bp = "BP", 
+          p = "P")
+
+## 2-df test results
+manhattan(df2_results %>%
+            na.omit(),
+          chr = "CHR",
+          bp = "BP",
+          p = "P")
+```
+
+## QQ plot
+
+We can create a QQ plot to check for systematic inflation of test statistics (which could be due to confounding).
+
+```{r PLINK_QQ_basic_logistic}
+## Q-Q plot 1-df results
+qq(df1_results$P)
+
+## Q-Q plot 2-df results
+qq(df2_results$P)
+```
+

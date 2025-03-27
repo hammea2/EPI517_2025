@@ -1,0 +1,172 @@
+---
+title: 'Demonstration: PLINK Principal Components Analysis'
+author: "Austin Hammermeister Suger"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+
+## Load R packages ##
+
+## Install pacman from CRAN
+#install.packages("pacman") # remove comment if you need to install this 
+library(pacman)
+
+## Install and load tidyverse, qqman, vcfR, and GGally from CRAN
+p_load(tidyverse,qqman,vcfR,GGally)
+```
+
+# General Notes
+
+Please do not just copy this code in the scripts for use in homework assignments. Try to reproduce the R code and PLINK commands so that you understand what they do.
+
+# Principal Components Analysis
+
+## Step 1: Variant QC and LD pruning
+
+First, we can load in the example.fam, example.bim, and example.bed PLINK binary fileset using the --bfile flag. 
+
+Next, we can apply the same variant QC flags we have been using before (--maf, --hwe, and --geno).
+
+Then we are ready to tell PLINK to conduct linkage disequilibrium (LD) pruning on the variants that passed QC in the example data set. To do this we can use the --indep-pairwise flag. This function has PLINK examing a set of variants within a defined window and then prune (drop) variants that are in high LD. This window is then shifted and variants are pruned from the next window. This process is repreated for each chromosome in the data set. 
+
+--indep-pairwise flag takes 3 parameters:
+1. A window size in variant count or kilobases (if the 'kb' modifier is present) units
+2. A variant count to shift the window at the end of each step 
+3. A pairwise r2 threshold: at each step, pairs of variants in the current window with squared correlation greater than the threshold are noted, and variants are greedily pruned from the window until no such pairs remain.
+
+Finally, we can use the --out flag to give the output files a name. Using --indep-pairwise will have PLINK output two files. The first is list of variants that are approximate linkage equilibrium with each other based on the parameters you set in a file ending in ".prune.in". The second is a is list of variants that were dropped during LD pruning based on the parameters you set in a file ending in ".prune.out".
+
+```{bash PLINK_prune}
+./plink \
+--bfile ./COURSE_MATERIALS/example_data/example \
+--maf 0.05 \
+--hwe midp 1e-25 \
+--geno 0.05 \
+--indep-pairwise 500 10 0.3  \
+--out ./example/example
+```
+
+## Principal Components Analysis 
+
+Again, we can load in the example.fam, example.bim, and example.bed PLINK binary fileset using the --bfile flag. 
+
+Then, we can filter to the list of variants that are approximate linkage equilibrium with each other by using the --extract flag on the prune.in file created in the previous step.
+
+Finally, we can conduct Principal Components Analysis on the LD pruned variants using the --pca flag. This will have PLINK create output files ending in .eigenval and .eigenvec (this file contains the principal components)
+
+```{bash PLINK_pca}
+./plink \
+--bfile ./COURSE_MATERIALS/example_data/example \
+--extract ./example/example.prune.in \
+--pca  \
+--out ./example/example
+```
+
+# Visualizing PCs
+
+
+
+```{r load_PCs}
+PCs = read.table("./example/example.eigenvec")
+colnames(PCs) = c("FID","IID",paste0("PC_",1:20))
+
+fam = read.table("./COURSE_MATERIALS/example_data/example.fam")
+
+plot_data = merge(fam,PCs, by.x = "V2", by.y = "IID")
+plot_data$case_status = ifelse(plot_data$V6==1,"control","case") 
+```
+
+```{r plot_PCs}
+ggplot(data = plot_data,
+       aes(x = PC_1, y = PC_2, color = case_status))+
+  geom_point()+
+  theme_bw()
+
+library(GGally, quietly = TRUE)
+        
+ggparcoord(data = plot_data, columns = 8:13, groupColumn = "case_status")+
+  theme_bw()
+```
+
+# PC adjusted GWAS for a binary outcome
+
+We can load the example PLINK binary fileset and apply the same QC flags we have been  (--maf, --hwe,--geno, and --mind). We use the --logistic flag to run logistic regression and --ci 0.95 to include confidence intervals. We can then load the .eigenvec files containing the PCs as covariates in the model using the --covar flag. I am choosing to include only the first 5 PCs so I add the --covar-number flag and specify that I want covariates 1 to 5. 
+
+```{bash PLINK_adjusted_logistic}
+./plink \
+--bfile ./COURSE_MATERIALS/example_data/example \
+--maf 0.05 \
+--hwe midp 1e-25 \
+--geno 0.05 \
+--mind 0.05 \
+--logistic \
+--ci 0.95 \
+--covar ./example/example.eigenvec \
+--covar-number 1-5 \
+--out ./example/example_PCadjusted
+```
+
+## Loading the results file
+
+We can load the logistic regression GWAS results file into R. This file does have column headers.
+
+```{r PLINK_adjusted_logistic}
+example_PCadjusted_logistic_GWAS_results<-read.table(file="./example/example_PCadjusted.assoc.logistic", header=TRUE, na="NA")
+glimpse(example_PCadjusted_logistic_GWAS_results)
+
+results = example_PCadjusted_logistic_GWAS_results %>% 
+  filter(TEST=="ADD")
+```
+
+## Manhattan plot
+
+We can create a Manhattan plot to more easily visualize the GWAS results.
+
+```{r PLINK_Manhattan_PCadjusted_logistic}
+## Manhattan plot 
+manhattan(results %>%
+            na.omit(),
+          chr = "CHR",
+          bp = "BP", 
+          p = "P")
+
+```
+
+## QQ plot
+
+We can create a QQ plot to check for systematic inflation in test statistics (which could be due to confounding).
+
+```{r PLINK_QQ_basic_logistic}
+## Q-Q plot
+qq(results$P)
+
+```
+
+## Genomic Inflation Factor
+
+We can also calculate the genomic inflation factor (λ) to quantify the degree of the inflation in observed test statistics. The most common way to calculate λ is to take the median value of the observed chi-square test statistics and divide it by the median value of a 1 df chi-square distribution. A λ value close to 1 would indicate that there is little inflation in test statistics (values above ~1.1 may be concerning).
+
+```{r lambda_GC}
+chisq <- qchisq(1-(results$P %>% na.omit()),1)
+lambda <- (median(chisq)/qchisq(0.5,1)) %>% round(4)
+
+paste0("λ_median = ", lambda)
+```
+
+# Comparison with unadjusted logistic regression
+This is the logistic regression GWAS we ran in the previous demonstration. Not that the λ value is larger without adjustment for the first 5 PCs.
+
+```{r basic_logistic_GWAS}
+example_basic_logistic_GWAS_results<-read.table(file="./example/example_basic.assoc.logistic", header = TRUE, na = NA)
+
+qq(example_basic_logistic_GWAS_results$P)
+
+chisq <- qchisq(1-(example_basic_logistic_GWAS_results$P %>% na.omit()),1)
+lambda <- (median(chisq)/qchisq(0.5,1)) %>% round(4)
+
+paste0("λ_median = ", lambda)
+```
