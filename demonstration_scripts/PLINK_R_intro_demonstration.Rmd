@@ -28,16 +28,6 @@ Please do not just copy this code for use in your homework assignments. Try to r
 ./plink
 ```
 
-# System function explanation
-
-In R, the system() function takes a string (set of characters) as an input and invokes it as a command in your machine's command-line. We can use this function to write our PLINK commands within an R script. However, the PLINK commands are not actually being executed in R, they are still being run in the command-line.
-
-```{r system}
-# Example echo command to run in our system's command line
-system("echo 'Hello World!'")
-
-```
-
 ## Load example.fam file into R (this is just a text file)
 
 This is just to show you the structure of a PLINK .fam file. PLINK .fam files do not have a header line, so we will need to name the columns based on our own knowledge. The columns in a .fam file indicate family ID, individual ID, paternal ID, maternal ID, sex, and phenotype.
