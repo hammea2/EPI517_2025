@@ -25,6 +25,8 @@ p_load(tidyverse,qqman,vcfR,RColorBrewer)
 
 Please do not just copy this code for use in your homework assignments. Try to reproduce the R code and PLINK commands so that you understand what they do.
 
+The default root directory of chunks in an .Rmd file will be the folder in which it is stored. This means that you may have to either move the .Rmd file you are working on out to the home directory, specify the root directory in the setup chunk with root.dir =, or use absolute file paths.
+
 # Verify PLINK installation
 
 ```{bash verify}
