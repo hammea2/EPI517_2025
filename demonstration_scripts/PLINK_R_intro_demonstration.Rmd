@@ -14,6 +14,9 @@ rm(list = ls())
 ## Install pacman from CRAN
 #install.packages("pacman") # remove comment if you need to install this 
 
+## Load pacman
+library(pacman)
+
 ## Install and load tidyverse, qqman, vcfR, and RColorBrewer from CRAN
 p_load(tidyverse,qqman,vcfR,RColorBrewer)
 ```
