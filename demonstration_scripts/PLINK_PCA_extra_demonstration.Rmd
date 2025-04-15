@@ -12,11 +12,11 @@ rm(list = ls())
 ## Load R packages ##
 
 ## Install pacman from CRAN
-#install.packages("pacman") # remove comment if you need to install this 
+install.packages("pacman")
 library(pacman)
 
-## Install and load tidyverse, qqman, vcfR, and GGally from CRAN
-p_load(tidyverse,qqman,vcfR,GGally)
+## Install and load tidyverse, qqman, and GGally from CRAN
+p_load(tidyverse,qqman,GGally)
 ```
 
 # General Notes
@@ -68,16 +68,15 @@ Finally, we can conduct Principal Components Analysis on the LD pruned variants 
 
 # Visualizing PCs
 
-
-
 ```{r load_PCs}
 PCs = read.table("./example/example.eigenvec")
 colnames(PCs) = c("FID","IID",paste0("PC_",1:20))
 
 fam = read.table("./COURSE_MATERIALS/example_data/example.fam")
+colnames(fam) = c("FID","IID","Paternal_ID","Maternal_ID","Sex","Phenotype")
 
-plot_data = merge(fam,PCs, by.x = "V2", by.y = "IID")
-plot_data$case_status = ifelse(plot_data$V6==1,"control","case") 
+plot_data = merge(fam,PCs, by = c("FID","IID"))
+plot_data$case_status = ifelse(plot_data$Phenotype==1,"control","case") 
 ```
 
 ```{r plot_PCs}
@@ -86,8 +85,6 @@ ggplot(data = plot_data,
   geom_point()+
   theme_bw()
 
-library(GGally, quietly = TRUE)
-        
 ggparcoord(data = plot_data, columns = 8:13, groupColumn = "case_status")+
   theme_bw()
 ```
@@ -120,6 +117,7 @@ glimpse(example_PCadjusted_logistic_GWAS_results)
 
 results = example_PCadjusted_logistic_GWAS_results %>% 
   filter(TEST=="ADD")
+glimpse(results)
 ```
 
 ## Manhattan plot
@@ -148,7 +146,7 @@ qq(results$P)
 
 ## Genomic Inflation Factor
 
-We can also calculate the genomic inflation factor (λ) to quantify the degree of the inflation in observed test statistics. The most common way to calculate λ is to take the median value of the observed chi-square test statistics and divide it by the median value of a 1 df chi-square distribution. A λ value close to 1 would indicate that there is little inflation in test statistics (values above ~1.1 may be concerning).
+We can also calculate the genomic inflation factor (λ) to quantify the degree of the inflation in observed test statistics. The most common way to calculate λ is to take the median value of the observed chi-square test statistics and divide it by the median value of a 1 df chi-square distribution. A λ value close to 1 would indicate that there is little inflation in test statistics (values above around 1.1 may be concerning depending on the sample size of your GWAS).
 
 ```{r lambda_GC}
 chisq <- qchisq(1-(results$P %>% na.omit()),1)
