@@ -85,7 +85,7 @@ ggplot(data = plot_data,
   geom_point()+
   theme_bw()
 
-ggparcoord(data = plot_data, columns = 8:13, groupColumn = "case_status")+
+ggparcoord(data = plot_data, columns = 7:13, groupColumn = "case_status")+
   theme_bw()
 ```
 
