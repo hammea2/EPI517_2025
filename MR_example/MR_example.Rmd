@@ -1,0 +1,93 @@
+---
+title: 'Example MR analysis'
+author: "Austin Hammermeister Suger"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+
+## Load R packages ##
+
+## Install pacman from CRAN
+install.packages("pacman")
+library(pacman)
+
+## Install and load tidyverse and kableExtra from CRAN
+p_load(tidyverse,kableExtra)
+
+# ## Install and load TwoSampleMR
+install.packages(
+  'TwoSampleMR',
+  repos = c(
+    'https://mrcieu.r-universe.dev/bin/linux/noble-x86_64/4.5/',
+    'https://p3m.dev/cran/__linux__/noble/latest',
+    'https://cloud.r-project.org'
+  )
+)
+
+library(TwoSampleMR)
+```
+
+
+# Load harmonized MR data
+- We already have a prepared MR instrument containing 363 SNPs associated with height
+- The GWAS summary statistics for height came from PMID 36224396
+- The GWAS summary statistics for systolic blood pressure came from PMID 34594039 
+- Both datasets are from analyses of individuals of East Asian genetic ancestry 
+
+```{r load MR data}
+MR_data = readRDS("~/COURSE_MATERIALS/MR_example/Example_harmonized_MR_data.rds")
+```
+
+
+# Inspect the MR data
+- What types of information is contained in this dataset?
+- Why is it required for MR?
+
+```{r view MR data}
+glimpse(MR_data) 
+```
+
+# Run an MR analysis with standard MR methods
+
+```{r run basic MR }
+basic_MR_results = TwoSampleMR::mr(MR_data)
+basic_MR_results %>% 
+  select(-c(id.exposure,id.outcome)) %>%
+  kable() %>%
+  kable_classic_2()
+```
+
+```{r MR results scatterplot}
+TwoSampleMR::mr_scatter_plot(basic_MR_results,MR_data)
+```
+
+# MR-Egger test for pleiotropy (MR-Egger intercept)
+
+```{r run MR-Egger }
+MR_pleiotropy_results = TwoSampleMR::mr_pleiotropy_test(MR_data)
+MR_pleiotropy_results %>% 
+  select(-c(id.exposure,id.outcome)) %>%
+  kable() %>%
+  kable_classic_2()
+```
+
+
+# Testing the association with other MR methods
+- If you have time, you can look at running MR analyyses using other MR methods
+- The mr_method_list() function provides a list of other MR methods included in the package
+
+```{r run other MR methods }
+TwoSampleMR::mr_method_list()  %>%
+  select(c(name,PubmedID)) %>%
+  kable() %>%
+  kable_classic_2()
+```
+
+# Additional information
+
+More detailed information on how to use the TwoSampleMR R package to perform MR analyses can be found here: https://mrcieu.github.io/TwoSampleMR/
+
