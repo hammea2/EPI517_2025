@@ -42,9 +42,8 @@ library(TwoSampleMR)
 MR_data = readRDS("~/COURSE_MATERIALS/MR_example/Example_harmonized_MR_data.rds")
 ```
 
-
 # Inspect the MR data
-- What types of information is contained in this dataset?
+- What type of information is contained in this dataset?
 - Why is it required for MR?
 
 ```{r view MR data}
@@ -55,17 +54,20 @@ glimpse(MR_data)
 
 ```{r run basic MR }
 basic_MR_results = TwoSampleMR::mr(MR_data)
+```
+
+
+# Produce a table and scatterplot for the results
+
+```{r MR results table and scatterplot}
 basic_MR_results %>% 
   select(-c(id.exposure,id.outcome)) %>%
   kable() %>%
   kable_classic_2()
-```
-
-```{r MR results scatterplot}
 TwoSampleMR::mr_scatter_plot(basic_MR_results,MR_data)
 ```
 
-# MR-Egger test for pleiotropy (MR-Egger intercept)
+# Run an MR-Egger test for pleiotropy (MR-Egger intercept)
 
 ```{r run MR-Egger }
 MR_pleiotropy_results = TwoSampleMR::mr_pleiotropy_test(MR_data)
@@ -76,7 +78,7 @@ MR_pleiotropy_results %>%
 ```
 
 
-# Testing the association with other MR methods
+# Optional: test the association with other MR methods
 - If you have time, you can look at running MR analyyses using other MR methods
 - The mr_method_list() function provides a list of other MR methods included in the package
 

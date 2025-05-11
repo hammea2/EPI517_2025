@@ -11,7 +11,7 @@
 
 <meta name="author" content="Austin Hammermeister Suger" />
 
-<meta name="date" content="2025-05-07" />
+<meta name="date" content="2025-05-11" />
 
 <title>Example MR analysis</title>
 
@@ -576,7 +576,7 @@ display: none;
 
 <h1 class="title toc-ignore">Example MR analysis</h1>
 <h4 class="author">Austin Hammermeister Suger</h4>
-<h4 class="date">2025-05-07</h4>
+<h4 class="date">2025-05-11</h4>
 
 </div>
 
@@ -597,7 +597,7 @@ ancestry</li>
 <div id="inspect-the-mr-data" class="section level1">
 <h1>Inspect the MR data</h1>
 <ul>
-<li>What types of information is contained in this dataset?</li>
+<li>What type of information is contained in this dataset?</li>
 <li>Why is it required for MR?</li>
 </ul>
 <pre class="r"><code>glimpse(MR_data) </code></pre>
@@ -642,6 +642,9 @@ ancestry</li>
 <h1>Run an MR analysis with standard MR methods</h1>
 <pre class="r"><code>basic_MR_results = TwoSampleMR::mr(MR_data)</code></pre>
 <pre><code>## Analysing &#39;height&#39; on &#39;systolic blood pressure&#39;</code></pre>
+</div>
+<div id="produce-a-table-and-scatterplot-for-the-results" class="section level1">
+<h1>Produce a table and scatterplot for the results</h1>
 <pre class="r"><code>basic_MR_results %&gt;% 
   select(-c(id.exposure,id.outcome)) %&gt;%
   kable() %&gt;%
@@ -713,10 +716,10 @@ Weighted median
 -0.0195178
 </td>
 <td style="text-align:right;">
-0.0142000
+0.0135395
 </td>
 <td style="text-align:right;">
-0.1692871
+0.1494312
 </td>
 </tr>
 <tr>
@@ -759,10 +762,10 @@ Simple mode
 -0.0665802
 </td>
 <td style="text-align:right;">
-0.0521468
+0.0512454
 </td>
 <td style="text-align:right;">
-0.2025108
+0.1947012
 </td>
 </tr>
 <tr>
@@ -782,10 +785,10 @@ Weighted mode
 -0.0738422
 </td>
 <td style="text-align:right;">
-0.0460924
+0.0449918
 </td>
 <td style="text-align:right;">
-0.1100317
+0.1016314
 </td>
 </tr>
 </tbody>
@@ -800,8 +803,8 @@ Weighted mode
 ##   id.exposure              id.outcome
 ## 1      height systolic blood pressure</code></pre>
 </div>
-<div id="mr-egger-test-for-pleiotropy-mr-egger-intercept" class="section level1">
-<h1>MR-Egger test for pleiotropy (MR-Egger intercept)</h1>
+<div id="run-an-mr-egger-test-for-pleiotropy-mr-egger-intercept" class="section level1">
+<h1>Run an MR-Egger test for pleiotropy (MR-Egger intercept)</h1>
 <pre class="r"><code>MR_pleiotropy_results = TwoSampleMR::mr_pleiotropy_test(MR_data)
 MR_pleiotropy_results %&gt;% 
   select(-c(id.exposure,id.outcome)) %&gt;%
@@ -848,8 +851,8 @@ height
 </tbody>
 </table>
 </div>
-<div id="testing-the-association-with-other-mr-methods" class="section level1">
-<h1>Testing the association with other MR methods</h1>
+<div id="optional-test-the-association-with-other-mr-methods" class="section level1">
+<h1>Optional: test the association with other MR methods</h1>
 <ul>
 <li>If you have time, you can look at running MR analyyses using other
 MR methods</li>
